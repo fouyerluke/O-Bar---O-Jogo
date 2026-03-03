@@ -3,301 +3,233 @@
 <head>
     <meta charset="UTF-8">
     <title>O Bar - O Jogo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        body {
-            background-color: #1a1a1a;
-            color: white;
-            font-family: 'Press Start 2P', cursive;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0;
-            padding-top: 10px;
-            overflow: hidden;
-        }
-        canvas {
-            border: 4px solid #5d4037;
-            border-radius: 8px;
-            background-color: #000;
-            width: 85vw; 
-            max-width: 1000px; 
-            height: auto;
-            image-rendering: pixelated; 
-        }
+        body { background-color: #1a1a1a; color: white; font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; margin: 0; padding-top: 10px; overflow: hidden; touch-action: none; }
+        canvas { border: 4px solid #5d4037; border-radius: 8px; background-color: #000; width: 85vw; max-width: 1000px; height: auto; image-rendering: pixelated; cursor: crosshair; }
     </style>
 </head>
 <body>
-
     <canvas id="telaDoJogo" width="1000" height="650"></canvas>
 
     <script>
         const canvas = document.getElementById("telaDoJogo");
         const ctx = canvas.getContext("2d");
-
-        // URL base para os arquivos "raw" do seu GitHub
         const urlBase = "https://raw.githubusercontent.com/fouyerluke/O-Bar---O-Jogo/main/O%20Bar%20-%20O%20Jogo/M%C3%ADdia/";
 
+        // --- VÍDEO DE INTRODUÇÃO ---
+        const videoIntro = document.createElement("video");
+        videoIntro.src = urlBase + "intro.mp4";
+        videoIntro.onended = () => { if(estadoJogo === "intro_video") estadoJogo = "menu_principal"; };
+
         // --- CARREGAMENTO DE IMAGENS ---
-        const imgInicio = new Image(); imgInicio.src = urlBase + "inicio.png";
-        const imgInstrucoes = new Image(); imgInstrucoes.src = urlBase + "instrucoes.png";
-        const imgBg2 = new Image(); imgBg2.src = urlBase + "bg2.png";
-        const imgFundo = new Image(); imgFundo.src = urlBase + "bg.png";
-        
-        // Personagens Antigos
-        const imgZeca = new Image(); imgZeca.src = urlBase + "zeca.png";
-        const imgSuzy = new Image(); imgSuzy.src = urlBase + "suzy.png";
-        const imgJulinho = new Image(); imgJulinho.src = urlBase + "julinho.png";
-        const imgTiffany = new Image(); imgTiffany.src = urlBase + "tiffany.png";
-        const imgVitin = new Image(); imgVitin.src = urlBase + "vitin.png";
-        const imgJucicleide = new Image(); imgJucicleide.src = urlBase + "jucicleide.png";
+        const imgs = ["inicio.png", "instrucoes.png", "bg2.png", "bg.png", "marcel.png", "cerveja.png", "drink.png", "drink2.png", "creditos.png"];
+        const loadedImgs = {};
+        imgs.forEach(name => {
+            let i = new Image(); i.src = urlBase + name;
+            loadedImgs[name.split('.')[0]] = i;
+        });
 
-        // Novos Personagens
-        const imgCris = new Image(); imgCris.src = urlBase + "cris%20do%20lero%20lero.png"; // %20 para espaços na URL
-        const imgJanete = new Image(); imgJanete.src = urlBase + "janete.png";
-        const imgJorginho = new Image(); imgJorginho.src = urlBase + "jorginho.png";
-        const imgRitinha = new Image(); imgRitinha.src = urlBase + "ritinha.png";
-        const imgShirlei = new Image(); imgShirlei.src = urlBase + "shirlei.png";
-        const imgValerio = new Image(); imgValerio.src = urlBase + "valerio.png";
-        
-        // Elementos
-        const imgMarcel = new Image(); imgMarcel.src = urlBase + "marcel.png";
-        const imgCerveja = new Image(); imgCerveja.src = urlBase + "cerveja.png";
-        const imgDrinkVoo = new Image(); imgDrinkVoo.src = urlBase + "drink.png";
-        const imgDrinkImortal = new Image(); imgDrinkImortal.src = urlBase + "drink2.png";
+        const charNames = [
+            { id: "zeca", nome: "ZECA" }, { id: "suzy", nome: "SUZY" }, { id: "julinho", nome: "JULINHO" },
+            { id: "tiffany", nome: "TIFFANY" }, { id: "vitin", nome: "VITIN" }, { id: "jucicleide", nome: "JUCICLEIDE" },
+            { id: "cris%20do%20lero%20lero", nome: "CRIS" }, { id: "janete", nome: "JANETE" }, { id: "jorginho", nome: "JORGINHO" },
+            { id: "ritinha", nome: "RITINHA" }, { id: "shirlei", nome: "SHIRLEI" }, { id: "valerio", nome: "VALERIO", hGameplay: 155 },
+            { id: "marcel", nome: "MARCEL (MODO INFINITO)", especial: true }
+        ];
 
-        // --- CARREGAMENTO DE SONS ---
+        const listaPersonagens = charNames.map(char => {
+            let i = new Image(); i.src = urlBase + char.id + ".png";
+            return { ...char, img: i };
+        });
+
         const somBotao = new Audio(urlBase + "botao.mp3");
         const somCerveja = new Audio(urlBase + "cerveja.mp3");
         const somDrink = new Audio(urlBase + "drink.mp3");
-        const somTema = new Audio(urlBase + "tema.mp3");
-        somTema.loop = true;
+        const somTema = new Audio(urlBase + "tema.mp3"); somTema.loop = true;
 
-        function tocarSom(som) {
-            som.currentTime = 0;
-            som.play().catch(e => {});
-        }
+        function tocarSom(som) { som.currentTime = 0; som.play().catch(e => {}); }
 
-        window.addEventListener("click", () => {
-            if (somTema.paused && estadoJogo !== "gameover") somTema.play();
-        }, { once: false });
+        let estadoJogo = "pre_intro"; // Novo estado para clique inicial
+        let selecaoMenu = 0, selecaoPersonagem = 0, paginaSelecao = 0, pontuacao = 0, cameraX = 0;
+        let modoMarcel = false, isMobileMode = false, teclas = {};
 
-        const larguraMundo = 1800;
-        const alturaMundo = 650;
+        let jogador = { x: 100, y: 400, h: 135, v: 4.5, img: null, dir: 1, voando: false, tVoo: 0, imortal: false, tImortal: 0 };
+        let ia = { x: 1600, y: 400, h: 135, v: 0.5, img: null, dir: -1 };
+        let cervejaItem = { x: 800, y: 400, ativa: true };
 
-        let estadoJogo = "menu_principal"; 
-        let selecaoMenu = 0; 
-        let selecaoPersonagem = 0; 
-        let pontuacao = 0;
-        let cameraX = 0;
-
-        const listaPersonagens = [
-            { nome: "ZECA", img: imgZeca },
-            { nome: "SUZY", img: imgSuzy },
-            { nome: "JULINHO", img: imgJulinho },
-            { nome: "TIFFANY", img: imgTiffany },
-            { nome: "VITIN", img: imgVitin },
-            { nome: "JUCICLEIDE", img: imgJucicleide },
-            { nome: "CRIS", img: imgCris },
-            { nome: "JANETE", img: imgJanete },
-            { nome: "JORGINHO", img: imgJorginho },
-            { nome: "RITINHA", img: imgRitinha },
-            { nome: "SHIRLEI", img: imgShirlei },
-            { nome: "VALERIO", img: imgValerio }
-        ];
-
-        let jogador = { 
-            x: 100, y: 400, altura: 135, velocidade: 4, imagem: null, direcao: 1, 
-            voando: false, tempoVoo: 0,
-            imortal: false, tempoImortal: 0
-        };
-        let marcel = { x: 1600, y: 400, altura: 135, velocidade: 0.3, imagem: imgMarcel, direcao: -1 };
-        let cervejaItem = { x: 0, y: 0, largura: 40, altura: 80 };
-        
-        let drinkVoo = { x: -200, y: -200, largura: 45, altura: 85, ativo: false };
-        let drinkImortal = { x: -200, y: -200, largura: 45, altura: 85, ativo: false };
-
-        let teclas = {};
-        window.addEventListener("keydown", (e) => {
-            const key = e.key.toLowerCase();
-            teclas[key] = true;
+        function handleMenuInteraction(x, y) {
+            if (estadoJogo === "pre_intro") {
+                estadoJogo = "intro_video";
+                videoIntro.play();
+                return;
+            }
+            if (estadoJogo === "intro_video") {
+                videoIntro.pause();
+                estadoJogo = "menu_principal";
+                return;
+            }
             if (somTema.paused && estadoJogo !== "gameover") somTema.play();
 
             if (estadoJogo === "menu_principal") {
-                if (key === "arrowup" || key === "w" || key === "arrowdown" || key === "s") {
-                    tocarSom(somBotao); selecaoMenu = (selecaoMenu === 0) ? 1 : 0;
-                }
-                if (key === "enter") {
-                    tocarSom(somBotao); estadoJogo = (selecaoMenu === 0) ? "menu_selecao" : "menu_instrucoes";
-                }
-            }
+                if (y > 410 && y < 450) { tocarSom(somBotao); isMobileMode = false; estadoJogo = "menu_selecao"; }
+                else if (y > 470 && y < 510) { tocarSom(somBotao); isMobileMode = true; estadoJogo = "menu_selecao"; }
+                else if (y > 530 && y < 570) { tocarSom(somBotao); estadoJogo = "menu_instrucoes"; }
+                else if (y > 590 && y < 630) { tocarSom(somBotao); estadoJogo = "menu_creditos"; }
+            } 
             else if (estadoJogo === "menu_selecao") {
-                // Navegação em grade 3 linhas x 4 colunas
-                if (key === "arrowleft" || key === "a") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem % 4 === 0) ? selecaoPersonagem + 3 : selecaoPersonagem - 1; }
-                if (key === "arrowright" || key === "d") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem % 4 === 3) ? selecaoPersonagem - 3 : selecaoPersonagem + 1; }
-                if (key === "arrowup" || key === "w") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem < 4) ? selecaoPersonagem + 8 : selecaoPersonagem - 4; }
-                if (key === "arrowdown" || key === "s") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem >= 8) ? selecaoPersonagem - 8 : selecaoPersonagem + 4; }
-                
-                if (key === "enter") {
-                    tocarSom(somBotao); jogador.imagem = listaPersonagens[selecaoPersonagem].img; iniciarJogo();
+                if (x > 750 && x < 980 && y > 560 && y < 610) {
+                    tocarSom(somBotao); paginaSelecao = (paginaSelecao + 1) % 3;
+                    selecaoPersonagem = paginaSelecao * 6; return;
                 }
-                if (key === "escape") { tocarSom(somBotao); estadoJogo = "menu_principal"; }
-            }
-            else if (estadoJogo === "menu_instrucoes" || estadoJogo === "gameover") {
-                if (key === "enter" || key === "escape" || key === "r") {
-                    tocarSom(somBotao);
-                    if (estadoJogo === "gameover") { somTema.currentTime = 0; somTema.play(); }
-                    estadoJogo = "menu_principal";
+                let inicioIndex = paginaSelecao * 6;
+                for (let i = 0; i < 6; i++) {
+                    let idx = inicioIndex + i; if (!listaPersonagens[idx]) break;
+                    let col = i % 3, row = Math.floor(i / 3);
+                    let centerX = 250 + col * 250; let py = 120 + row * 210;
+                    if (x > centerX - 60 && x < centerX + 60 && y > py && y < py + 180) {
+                        selecaoPersonagem = idx; tocarSom(somBotao); iniciarJogo(); return;
+                    }
                 }
             }
+            else if (estadoJogo === "menu_instrucoes" || estadoJogo === "menu_creditos") { tocarSom(somBotao); estadoJogo = "menu_principal"; }
+            else if (estadoJogo === "gameover") { tocarSom(somBotao); iniciarJogo(); }
+        }
+
+        canvas.addEventListener("mousedown", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            handleMenuInteraction(x, y);
         });
 
-        window.addEventListener("keyup", (e) => { teclas[e.key.toLowerCase()] = false; });
+        window.addEventListener("keydown", (e) => {
+            const k = e.key.toLowerCase(); teclas[k] = true;
+            if (estadoJogo === "intro_video") { videoIntro.pause(); estadoJogo = "menu_principal"; return; }
+            if (somTema.paused && estadoJogo !== "gameover" && estadoJogo !== "pre_intro") somTema.play();
+            if (e.key === "Escape" && estadoJogo !== "menu_principal") { tocarSom(somBotao); estadoJogo = "menu_principal"; return; }
 
-        function desenharSpriteProporcional(imagem, x, y, alturaDesejada, direcao, opacidade = 1) {
-            if (!imagem.complete || imagem.width === 0) return 0;
-            let larguraProporcional = (imagem.width / imagem.height) * alturaDesejada;
-            ctx.save();
-            ctx.globalAlpha = opacidade;
-            if (direcao === -1) {
-                ctx.translate(x + larguraProporcional, y); ctx.scale(-1, 1);
-                ctx.drawImage(imagem, 0, 0, larguraProporcional, alturaDesejada);
-            } else { ctx.drawImage(imagem, x, y, larguraProporcional, alturaDesejada); }
-            ctx.restore();
-            return larguraProporcional;
-        }
-
-        function posicionarItens() {
-            cervejaItem.x = Math.floor(Math.random() * (larguraMundo - 100)) + 50;
-            cervejaItem.y = Math.floor(Math.random() * 200) + 300;
-            
-            if (Math.random() < 0.10 && !drinkVoo.ativo) {
-                drinkVoo.x = Math.floor(Math.random() * (larguraMundo - 100)) + 50;
-                drinkVoo.y = Math.floor(Math.random() * 200) + 300;
-                drinkVoo.ativo = true;
-            }
-            if (Math.random() < 0.08 && !drinkImortal.ativo) {
-                drinkImortal.x = Math.floor(Math.random() * (larguraMundo - 100)) + 50;
-                drinkImortal.y = Math.floor(Math.random() * 200) + 300;
-                drinkImortal.ativo = true;
-            }
-        }
+            if (estadoJogo === "menu_principal") {
+                if (k === "arrowup" || k === "w") { tocarSom(somBotao); selecaoMenu = (selecaoMenu - 1 + 4) % 4; }
+                if (k === "arrowdown" || k === "s") { tocarSom(somBotao); selecaoMenu = (selecaoMenu + 1) % 4; }
+                if (e.key === "Enter") {
+                    tocarSom(somBotao);
+                    if (selecaoMenu === 0) { isMobileMode = false; estadoJogo = "menu_selecao"; }
+                    else if (selecaoMenu === 1) { isMobileMode = true; estadoJogo = "menu_selecao"; }
+                    else if (selecaoMenu === 2) estadoJogo = "menu_instrucoes";
+                    else estadoJogo = "menu_creditos";
+                }
+            } else if (estadoJogo === "menu_selecao") {
+                if (k === "arrowright" || k === "d") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem + 1) % listaPersonagens.length; paginaSelecao = Math.floor(selecaoPersonagem / 6); }
+                if (k === "arrowleft" || k === "a") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem - 1 + listaPersonagens.length) % listaPersonagens.length; paginaSelecao = Math.floor(selecaoPersonagem / 6); }
+                if (e.key === "Enter") { tocarSom(somBotao); iniciarJogo(); }
+            } else if (k === "r" && estadoJogo === "gameover") { tocarSom(somBotao); iniciarJogo(); }
+        });
+        window.addEventListener("keyup", (e) => teclas[e.key.toLowerCase()] = false);
 
         function iniciarJogo() {
-            pontuacao = 0;
-            jogador.x = 100; jogador.y = 400; jogador.voando = false; jogador.imortal = false;
-            marcel.x = 1600; marcel.y = 400; marcel.velocidade = 0.3;
-            drinkVoo.ativo = false; drinkImortal.ativo = false;
-            posicionarItens();
+            pontuacao = 0; jogador.x = 100; jogador.y = 400; 
+            const p = listaPersonagens[selecaoPersonagem];
+            jogador.img = p.img; jogador.h = p.hGameplay || 135;
+            modoMarcel = p.especial;
+            if (modoMarcel) spawnVitima(); else { ia.img = loadedImgs.marcel; ia.x = 1600; ia.y = 400; ia.v = 0.5; spawnItens(); }
             estadoJogo = "jogando";
+        }
+
+        function spawnVitima() {
+            let pAleatorio = listaPersonagens[Math.floor(Math.random() * 12)];
+            ia.img = pAleatorio.img; ia.x = Math.random() * 1500 + 100; ia.y = Math.random() * 200 + 300;
+            ia.v = 2.5 + (pontuacao * 0.1);
+        }
+
+        function spawnItens() {
+            cervejaItem = { x: Math.random() * 1600 + 100, y: Math.random() * 200 + 300, ativa: true };
+        }
+
+        function desenharSprite(img, x, y, h, dir, opac = 1) {
+            if (!img || !img.complete) return;
+            let w = (img.width / img.height) * h;
+            ctx.save(); ctx.globalAlpha = opac;
+            if (dir === -1) { ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, h); }
+            else { ctx.drawImage(img, x, y, w, h); }
+            ctx.restore();
         }
 
         function loop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            if (estadoJogo === "menu_principal") {
-                if (imgInicio.complete) ctx.drawImage(imgInicio, 0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "18px 'Press Start 2P'";
-                ctx.fillStyle = (selecaoMenu === 0) ? "#f1c40f" : "white";
-                ctx.fillText("> ESCOLHER PERSONAGEM", canvas.width/2, 450);
-                ctx.fillStyle = (selecaoMenu === 1) ? "#f1c40f" : "white";
-                ctx.fillText("> INSTRUCOES", canvas.width/2, 510);
+            
+            if (estadoJogo === "pre_intro") {
+                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650);
+                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "14px 'Press Start 2P'";
+                ctx.fillText("CLIQUE PARA INICIAR", 500, 325);
             }
-
-            else if (estadoJogo === "menu_selecao") {
-                if (imgBg2.complete) ctx.drawImage(imgBg2, 0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "20px 'Press Start 2P'";
-                ctx.fillText("QUEM VAI PRO BAR?", canvas.width/2, 60);
-                
-                listaPersonagens.forEach((p, i) => {
-                    let col = i % 4; 
-                    let row = Math.floor(i / 4);
-                    // Ajuste de posições para caber as 3 linhas e 4 colunas perfeitamente
-                    let posX = 130 + (col * 200);
-                    let posY = 100 + (row * 160); 
-                    
-                    if (selecaoPersonagem === i) {
-                        ctx.shadowColor = "#f1c40f"; ctx.shadowBlur = 25; ctx.fillStyle = "#f1c40f";
-                    } else { ctx.fillStyle = "white"; }
-                    
-                    // Altura reduzida para 130 para caber as 3 fileiras no menu sem sobrepor
-                    desenharSpriteProporcional(p.img, posX, posY, 130, 1);
-                    
-                    ctx.shadowBlur = 0;
-                    ctx.font = "8px 'Press Start 2P'"; 
-                    ctx.fillText(p.nome, posX + 35, posY + 150);
+            else if (estadoJogo === "intro_video") {
+                ctx.drawImage(videoIntro, 0, 0, 1000, 650);
+                ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "8px 'Press Start 2P'"; ctx.textAlign = "right";
+                ctx.fillText("ENTER PARA PULAR", 980, 630);
+            }
+            else if (estadoJogo === "menu_principal") {
+                if (loadedImgs.inicio.complete) ctx.drawImage(loadedImgs.inicio, 0, 0, canvas.width, canvas.height);
+                ctx.textAlign = "center"; ctx.font = "18px 'Press Start 2P'";
+                [["JOGAR", 430], ["MODO MOBILE", 490], ["INSTRUCOES", 550], ["CREDITOS", 610]].forEach((m, i) => {
+                    ctx.fillStyle = (selecaoMenu === i) ? "#f1c40f" : "white"; ctx.fillText("> " + m[0], 500, m[1]);
                 });
-                ctx.font = "10px 'Press Start 2P'"; ctx.fillStyle = "#bdc3c7";
-                ctx.fillText("SETAS: NAVEGAR | ENTER: CONFIRMAR | ESC: VOLTAR", canvas.width/2, 610);
-            }
-
-            else if (estadoJogo === "menu_instrucoes") {
-                if (imgInstrucoes.complete) ctx.drawImage(imgInstrucoes, 0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "#f1c40f"; ctx.textAlign = "right"; ctx.font = "10px 'Press Start 2P'";
-                ctx.fillText("[ ENTER/ESC: VOLTAR ]", 970, 620);
-            }
-
-            else if (estadoJogo === "jogando") {
-                if (jogador.voando) { jogador.tempoVoo--; if (jogador.tempoVoo <= 0) jogador.voando = false; }
-                if (jogador.imortal) { jogador.tempoImortal--; if (jogador.tempoImortal <= 0) jogador.imortal = false; }
-
-                let limY = jogador.voando ? 0 : 220;
-                if ((teclas["w"] || teclas["arrowup"]) && jogador.y > limY) jogador.y -= jogador.velocidade;
-                if ((teclas["s"] || teclas["arrowdown"]) && jogador.y < alturaMundo - jogador.altura) jogador.y += jogador.velocidade;
-                if (teclas["a"] || teclas["arrowleft"]) { if (jogador.x > 0) { jogador.x -= jogador.velocidade; jogador.direcao = -1; } }
-                if (teclas["d"] || teclas["arrowright"]) { if (jogador.x < larguraMundo - 100) { jogador.x += jogador.velocidade; jogador.direcao = 1; } }
-
-                cameraX = Math.max(0, Math.min(jogador.x - 500, larguraMundo - 1000));
-                ctx.drawImage(imgFundo, -cameraX, 0, larguraMundo, canvas.height);
-
-                if (marcel.x < jogador.x) { marcel.x += marcel.velocidade; marcel.direcao = 1; }
-                else { marcel.x -= marcel.velocidade; marcel.direcao = -1; }
-                if (marcel.y < jogador.y) marcel.y += marcel.velocidade; else marcel.y -= marcel.velocidade;
-                if (marcel.y < 220) marcel.y = 220;
-
-                let opacidadeFinal = jogador.voando ? 0.6 : 1;
-                if (jogador.imortal && Math.floor(Date.now() / 100) % 2) ctx.filter = "brightness(2) sepia(1) saturate(5)";
-
-                let largJog = desenharSpriteProporcional(jogador.imagem, jogador.x - cameraX, jogador.y, jogador.altura, jogador.direcao, opacidadeFinal);
-                ctx.filter = "none";
-                let largMarc = desenharSpriteProporcional(imgMarcel, marcel.x - cameraX, marcel.y, marcel.altura, marcel.direcao);
-
-                if (jogador.x < cervejaItem.x + 40 && jogador.x + largJog > cervejaItem.x && jogador.y < cervejaItem.y + 80 && jogador.y + jogador.altura > cervejaItem.y) {
-                    tocarSom(somCerveja); pontuacao++; marcel.velocidade += 0.05; posicionarItens();
+            } else if (estadoJogo === "menu_selecao") {
+                ctx.drawImage(loadedImgs.bg2, 0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "20px 'Press Start 2P'";
+                ctx.fillText("QUEM VAI PRO BAR?", 500, 60);
+                ctx.font = "10px 'Press Start 2P'"; ctx.fillStyle = "#f1c40f"; ctx.textAlign = "right";
+                ctx.fillText("PAGINA " + (paginaSelecao+1) + "/3", 960, 590);
+                ctx.textAlign = "center";
+                let inicioIndex = paginaSelecao * 6;
+                for (let i = 0; i < 6; i++) {
+                    let idx = inicioIndex + i; if (!listaPersonagens[idx]) break;
+                    let p = listaPersonagens[idx], col = i % 3, row = Math.floor(i / 3);
+                    let charW = (p.img && p.img.complete) ? (p.img.width / p.img.height) * 170 : 80;
+                    let centerX = 250 + col * 250; let py = 120 + row * 210;
+                    if (selecaoPersonagem === idx) { ctx.shadowColor = "#f1c40f"; ctx.shadowBlur = 25; ctx.fillStyle = "#f1c40f"; } 
+                    else { ctx.shadowBlur = 0; ctx.fillStyle = "white"; }
+                    desenharSprite(p.img, centerX - charW/2, py, 170, 1);
+                    ctx.font = "10px 'Press Start 2P'"; ctx.fillText(p.nome, centerX, py + 195);
                 }
-                if (drinkVoo.ativo && jogador.x < drinkVoo.x + 45 && jogador.x + largJog > drinkVoo.x && jogador.y < drinkVoo.y + 85 && jogador.y + jogador.altura > drinkVoo.y) {
-                    tocarSom(somDrink); jogador.voando = true; jogador.tempoVoo = 480; drinkVoo.ativo = false;
+            } else if (estadoJogo === "jogando") {
+                let limY = 220;
+                if (teclas.w || teclas.arrowup) jogador.y = Math.max(limY, jogador.y - jogador.v);
+                if (teclas.s || teclas.arrowdown) jogador.y = Math.min(650 - jogador.h, jogador.y + jogador.v);
+                if (teclas.a || teclas.arrowleft) { jogador.x = Math.max(0, jogador.x - jogador.v); jogador.dir = -1; }
+                if (teclas.d || teclas.arrowright) { jogador.x = Math.min(1700, jogador.x + jogador.v); jogador.dir = 1; }
+                cameraX = Math.max(0, Math.min(jogador.x - 500, 800));
+                ctx.drawImage(loadedImgs.bg, -cameraX, 0, 1800, 650);
+                let jCX = jogador.x + 35, jCY = jogador.y + (jogador.h / 2), iCX = ia.x + 35, iCY = ia.y + (ia.h / 2);
+                if (modoMarcel) {
+                    let dx = ia.x - jogador.x, dy = ia.y - jogador.y, dist = Math.hypot(dx, dy);
+                    if (dist < 400) { ia.x += (dx/dist)*ia.v; ia.y += (dy/dist)*ia.v; ia.dir = dx > 0 ? -1 : 1; }
+                    ia.x = Math.max(50, Math.min(1750, ia.x)); ia.y = Math.max(220, Math.min(500, ia.y));
+                    if (Math.hypot(jCX - (ia.x + 35), jCY - (ia.y + 67)) < 55) { pontuacao++; spawnVitima(); }
+                } else {
+                    if (ia.x < jogador.x) ia.x += ia.v; else ia.x -= ia.v;
+                    if (ia.y < jogador.y) ia.y += ia.v; else ia.y -= ia.v;
+                    if (ia.y < 220) ia.y = 220;
+                    if (cervejaItem.ativa) {
+                        ctx.drawImage(loadedImgs.cerveja, cervejaItem.x - cameraX, cervejaItem.y, 40, 80);
+                        if (Math.hypot(jCX - (cervejaItem.x + 20), jCY - (cervejaItem.y + 40)) < 55) { somCerveja.play(); pontuacao++; ia.v += 0.08; spawnItens(); }
+                    }
+                    if (Math.hypot(jCX - iCX, jCY - iCY) < 55) estadoJogo = "gameover";
                 }
-                if (drinkImortal.ativo && jogador.x < drinkImortal.x + 45 && jogador.x + largJog > drinkImortal.x && jogador.y < drinkImortal.y + 85 && jogador.y + jogador.altura > drinkImortal.y) {
-                    tocarSom(somDrink); jogador.imortal = true; jogador.tempoImortal = 600; drinkImortal.ativo = false;
-                }
-                if (!jogador.imortal && jogador.x < marcel.x + largMarc - 15 && jogador.x + largJog - 15 > marcel.x && jogador.y < marcel.y + marcel.altura - 15 && jogador.y + jogador.altura - 15 > marcel.y) {
-                    estadoJogo = "gameover";
-                }
-
-                ctx.drawImage(imgCerveja, cervejaItem.x - cameraX, cervejaItem.y, 40, 80);
-                if (drinkVoo.ativo) ctx.drawImage(imgDrinkVoo, drinkVoo.x - cameraX, drinkVoo.y, 45, 85);
-                if (drinkImortal.ativo) ctx.drawImage(imgDrinkImortal, drinkImortal.x - cameraX, drinkImortal.y, 45, 85);
-
-                ctx.drawImage(imgCerveja, 20, 20, 20, 40);
-                ctx.fillStyle = "white"; ctx.font = "16px 'Press Start 2P'"; ctx.textAlign = "left";
-                ctx.fillText(": " + pontuacao, 55, 50);
-                if (jogador.voando) { ctx.fillStyle = "#3498db"; ctx.fillText("VOO", 150, 50); }
-                if (jogador.imortal) { ctx.fillStyle = "#f1c40f"; ctx.fillText("IMORTAL", 250, 50); }
-            }
-
-            else if (estadoJogo === "gameover") {
-                somTema.pause(); ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "#e74c3c"; ctx.textAlign = "center"; ctx.font = "20px 'Press Start 2P'";
-                ctx.fillText("MARCEL TE PEGOU!", canvas.width/2, 300);
-                ctx.fillStyle = "white"; ctx.font = "12px 'Press Start 2P'";
-                ctx.fillText("CONTA FINAL: " + pontuacao + " CERVEJAS", canvas.width/2, 380);
-                ctx.fillText("APERTE R PARA RECOMECAR", canvas.width/2, 450);
-            }
-
+                desenharSprite(ia.img, ia.x - cameraX, ia.y, 135, ia.dir);
+                desenharSprite(jogador.img, jogador.x - cameraX, jogador.y, jogador.h, jogador.dir);
+                ctx.fillStyle = "white"; ctx.textAlign = "left"; ctx.font = "16px 'Press Start 2P'";
+                ctx.fillText((modoMarcel ? "MODO INFINITO: " : ": ") + pontuacao, modoMarcel ? 20 : 55, 50);
+            } else if (estadoJogo === "gameover") {
+                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650); ctx.textAlign = "center";
+                ctx.fillStyle = "red"; ctx.font = "30px 'Press Start 2P'"; ctx.fillText("GAME OVER", 500, 250);
+                ctx.fillStyle = "white"; ctx.font = "16px 'Press Start 2P'"; ctx.fillText("CONTA: " + pontuacao, 500, 350);
+                ctx.font = "12px 'Press Start 2P'"; ctx.fillStyle = "#f1c40f"; ctx.fillText("R PARA RECOMECAR", 500, 450);
+            } else if (estadoJogo === "menu_creditos") ctx.drawImage(loadedImgs.creditos, 0, 0, 1000, 650);
+            else if (estadoJogo === "menu_instrucoes") ctx.drawImage(loadedImgs.instrucoes, 0, 0, 1000, 650);
             requestAnimationFrame(loop);
-        }
-        loop();
+        } loop();
     </script>
 </body>
 </html>
