@@ -44,13 +44,23 @@
         const imgBg2 = new Image(); imgBg2.src = urlBase + "bg2.png";
         const imgFundo = new Image(); imgFundo.src = urlBase + "bg.png";
         
+        // Personagens Antigos
         const imgZeca = new Image(); imgZeca.src = urlBase + "zeca.png";
         const imgSuzy = new Image(); imgSuzy.src = urlBase + "suzy.png";
         const imgJulinho = new Image(); imgJulinho.src = urlBase + "julinho.png";
         const imgTiffany = new Image(); imgTiffany.src = urlBase + "tiffany.png";
         const imgVitin = new Image(); imgVitin.src = urlBase + "vitin.png";
         const imgJucicleide = new Image(); imgJucicleide.src = urlBase + "jucicleide.png";
+
+        // Novos Personagens
+        const imgCris = new Image(); imgCris.src = urlBase + "cris%20do%20lero%20lero.png"; // %20 para espaços na URL
+        const imgJanete = new Image(); imgJanete.src = urlBase + "janete.png";
+        const imgJorginho = new Image(); imgJorginho.src = urlBase + "jorginho.png";
+        const imgRitinha = new Image(); imgRitinha.src = urlBase + "ritinha.png";
+        const imgShirlei = new Image(); imgShirlei.src = urlBase + "shirlei.png";
+        const imgValerio = new Image(); imgValerio.src = urlBase + "valerio.png";
         
+        // Elementos
         const imgMarcel = new Image(); imgMarcel.src = urlBase + "marcel.png";
         const imgCerveja = new Image(); imgCerveja.src = urlBase + "cerveja.png";
         const imgDrinkVoo = new Image(); imgDrinkVoo.src = urlBase + "drink.png";
@@ -87,7 +97,13 @@
             { nome: "JULINHO", img: imgJulinho },
             { nome: "TIFFANY", img: imgTiffany },
             { nome: "VITIN", img: imgVitin },
-            { nome: "JUCICLEIDE", img: imgJucicleide }
+            { nome: "JUCICLEIDE", img: imgJucicleide },
+            { nome: "CRIS", img: imgCris },
+            { nome: "JANETE", img: imgJanete },
+            { nome: "JORGINHO", img: imgJorginho },
+            { nome: "RITINHA", img: imgRitinha },
+            { nome: "SHIRLEI", img: imgShirlei },
+            { nome: "VALERIO", img: imgValerio }
         ];
 
         let jogador = { 
@@ -116,10 +132,11 @@
                 }
             }
             else if (estadoJogo === "menu_selecao") {
-                if (key === "arrowleft" || key === "a") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem % 3 === 0) ? selecaoPersonagem + 2 : selecaoPersonagem - 1; }
-                if (key === "arrowright" || key === "d") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem % 3 === 2) ? selecaoPersonagem - 2 : selecaoPersonagem + 1; }
-                if (key === "arrowup" || key === "w") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem < 3) ? selecaoPersonagem + 3 : selecaoPersonagem - 3; }
-                if (key === "arrowdown" || key === "s") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem >= 3) ? selecaoPersonagem - 3 : selecaoPersonagem + 3; }
+                // Navegação em grade 3 linhas x 4 colunas
+                if (key === "arrowleft" || key === "a") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem % 4 === 0) ? selecaoPersonagem + 3 : selecaoPersonagem - 1; }
+                if (key === "arrowright" || key === "d") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem % 4 === 3) ? selecaoPersonagem - 3 : selecaoPersonagem + 1; }
+                if (key === "arrowup" || key === "w") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem < 4) ? selecaoPersonagem + 8 : selecaoPersonagem - 4; }
+                if (key === "arrowdown" || key === "s") { tocarSom(somBotao); selecaoPersonagem = (selecaoPersonagem >= 8) ? selecaoPersonagem - 8 : selecaoPersonagem + 4; }
                 
                 if (key === "enter") {
                     tocarSom(somBotao); jogador.imagem = listaPersonagens[selecaoPersonagem].img; iniciarJogo();
@@ -190,23 +207,25 @@
             else if (estadoJogo === "menu_selecao") {
                 if (imgBg2.complete) ctx.drawImage(imgBg2, 0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "20px 'Press Start 2P'";
-                ctx.fillText("QUEM VAI PRO BAR?", canvas.width/2, 80);
+                ctx.fillText("QUEM VAI PRO BAR?", canvas.width/2, 60);
                 
                 listaPersonagens.forEach((p, i) => {
-                    let col = i % 3; 
-                    let row = Math.floor(i / 3);
-                    let posX = 180 + (col * 240);
-                    let posY = 150 + (row * 220);
+                    let col = i % 4; 
+                    let row = Math.floor(i / 4);
+                    // Ajuste de posições para caber as 3 linhas e 4 colunas perfeitamente
+                    let posX = 130 + (col * 200);
+                    let posY = 100 + (row * 160); 
                     
                     if (selecaoPersonagem === i) {
                         ctx.shadowColor = "#f1c40f"; ctx.shadowBlur = 25; ctx.fillStyle = "#f1c40f";
                     } else { ctx.fillStyle = "white"; }
                     
-                    desenharSpriteProporcional(p.img, posX, posY, 170, 1);
+                    // Altura reduzida para 130 para caber as 3 fileiras no menu sem sobrepor
+                    desenharSpriteProporcional(p.img, posX, posY, 130, 1);
                     
                     ctx.shadowBlur = 0;
                     ctx.font = "8px 'Press Start 2P'"; 
-                    ctx.fillText(p.nome, posX + 40, posY + 195);
+                    ctx.fillText(p.nome, posX + 35, posY + 150);
                 });
                 ctx.font = "10px 'Press Start 2P'"; ctx.fillStyle = "#bdc3c7";
                 ctx.fillText("SETAS: NAVEGAR | ENTER: CONFIRMAR | ESC: VOLTAR", canvas.width/2, 610);
