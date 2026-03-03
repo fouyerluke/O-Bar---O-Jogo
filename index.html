@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>O Bar - O Jogo</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #1a1a1a; color: white; font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; margin: 0; padding-top: 10px; overflow: hidden; touch-action: none; }
-        canvas { border: 4px solid #5d4037; border-radius: 8px; background-color: #000; width: 95vw; max-width: 1000px; height: auto; image-rendering: pixelated; cursor: crosshair; }
+        body { background-color: #1a1a1a; color: white; font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; margin: 0; padding-top: 10px; overflow: hidden; }
+        canvas { border: 4px solid #5d4037; border-radius: 8px; background-color: #000; width: 85vw; max-width: 1000px; height: auto; image-rendering: pixelated; }
     </style>
 </head>
 <body>
-    <canvas id="telaDoJogo" width="1000" height="650"></canvas>
+    <canvas id="telaDoJogo" width="1000" height="650" tabindex="1"></canvas>
 
     <script>
         const canvas = document.getElementById("telaDoJogo");
@@ -21,14 +20,11 @@
         // --- MÍDIA ---
         const videoIntro = document.createElement("video");
         videoIntro.src = urlBase + "intro.mp4";
-        videoIntro.onended = () => iniciarMenuComFade();
+        videoIntro.onended = () => { estadoJogo = "menu_principal"; menuFade = 0; };
 
         const imgs = ["inicio.png", "instrucoes.png", "bg2.png", "bg.png", "marcel.png", "cerveja.png", "drink.png", "drink2.png", "creditos.png"];
         const loadedImgs = {};
-        imgs.forEach(name => {
-            let i = new Image(); i.src = urlBase + name;
-            loadedImgs[name.split('.')[0]] = i;
-        });
+        imgs.forEach(name => { let i = new Image(); i.src = urlBase + name; loadedImgs[name.split('.')[0]] = i; });
 
         const charNames = [
             { id: "zeca", nome: "ZECA" }, { id: "suzy", nome: "SUZY" }, { id: "julinho", nome: "JULINHO" },
@@ -38,96 +34,25 @@
             { id: "marcel", nome: "MARCEL (MODO INFINITO)", especial: true }
         ];
 
-        const listaPersonagens = charNames.map(char => {
-            let i = new Image(); i.src = urlBase + char.id + ".png";
-            return { ...char, img: i };
-        });
-
+        const listaPersonagens = charNames.map(char => { let i = new Image(); i.src = urlBase + char.id + ".png"; return { ...char, img: i }; });
         const somBotao = new Audio(urlBase + "botao.mp3");
         const somCerveja = new Audio(urlBase + "cerveja.mp3");
         const somTema = new Audio(urlBase + "tema.mp3"); somTema.loop = true;
-
         function tocarSom(som) { som.currentTime = 0; som.play().catch(e => {}); }
 
-        // --- ESTADOS E VARIÁVEIS ---
-        let estadoJogo = "pre_intro"; 
-        let selecaoMenu = 0, selecaoPersonagem = 0, paginaSelecao = 0, pontuacao = 0, cameraX = 0;
-        let modoMarcel = false, isMobileMode = false, teclas = {};
-        let menuFade = 0; // Para o efeito de fade-in
-
-        let jogador = { x: 100, y: 400, h: 135, v: 4.5, img: null, dir: 1, voando: false, tVoo: 0, imortal: false };
+        let estadoJogo = "pre_intro", selecaoMenu = 0, selecaoPersonagem = 0, paginaSelecao = 0, pontuacao = 0, cameraX = 0;
+        let modoMarcel = false, teclas = {}, menuFade = 0;
+        let jogador = { x: 100, y: 400, h: 135, v: 5, img: null, dir: 1 };
         let ia = { x: 1600, y: 400, h: 135, v: 0.5, img: null, dir: -1 };
         let cervejaItem = { x: 800, y: 400, ativa: true };
-
-        function iniciarMenuComFade() {
-            estadoJogo = "menu_principal";
-            menuFade = 0;
-        }
-
-        function toggleFullScreen() {
-            if (!document.fullscreenElement) {
-                canvas.requestFullscreen().catch(err => {
-                    alert(`Erro ao tentar modo tela cheia: ${err.message}`);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        function handleMenuInteraction(x, y) {
-            if (estadoJogo === "pre_intro") { estadoJogo = "intro_video"; videoIntro.play(); return; }
-            if (estadoJogo === "intro_video") { videoIntro.pause(); iniciarMenuComFade(); return; }
-            if (somTema.paused && !["gameover", "pre_intro", "intro_video"].includes(estadoJogo)) somTema.play();
-
-            // Botão Tela Cheia (Canto superior direito)
-            if (x > 920 && y < 80) { toggleFullScreen(); return; }
-
-            if (estadoJogo === "menu_principal") {
-                // Lógica 2x2: Coluna 1 (x < 500), Coluna 2 (x > 500)
-                if (y > 420 && y < 500) { // Linha 1
-                    if (x < 500) { tocarSom(somBotao); isMobileMode = false; estadoJogo = "menu_selecao"; }
-                    else { tocarSom(somBotao); isMobileMode = true; estadoJogo = "menu_selecao"; }
-                } else if (y > 520 && y < 600) { // Linha 2
-                    if (x < 500) { tocarSom(somBotao); estadoJogo = "menu_instrucoes"; }
-                    else { tocarSom(somBotao); estadoJogo = "menu_creditos"; }
-                }
-            } 
-            else if (estadoJogo === "menu_selecao") {
-                if (x > 750 && y > 560) { tocarSom(somBotao); paginaSelecao = (paginaSelecao + 1) % 3; selecaoPersonagem = paginaSelecao * 6; return; }
-                let inicioIndex = paginaSelecao * 6;
-                for (let i = 0; i < 6; i++) {
-                    let idx = inicioIndex + i; if (!listaPersonagens[idx]) break;
-                    let col = i % 3, row = Math.floor(i / 3);
-                    let centerX = 250 + col * 250; let py = 120 + row * 210;
-                    if (x > centerX - 60 && x < centerX + 60 && y > py && y < py + 180) {
-                        selecaoPersonagem = idx; tocarSom(somBotao); iniciarJogo(); return;
-                    }
-                }
-            }
-            else if (["menu_instrucoes", "menu_creditos", "gameover"].includes(estadoJogo)) { tocarSom(somBotao); estadoJogo = "menu_principal"; }
-        }
-
-        canvas.addEventListener("mousedown", (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-            handleMenuInteraction(x, y);
-        });
-
-        window.addEventListener("keydown", (e) => {
-            const k = e.key.toLowerCase(); teclas[k] = true;
-            if (estadoJogo === "intro_video") { videoIntro.pause(); iniciarMenuComFade(); return; }
-            if (e.key === "Escape" && estadoJogo !== "menu_principal") { tocarSom(somBotao); estadoJogo = "menu_principal"; return; }
-            if (k === "r" && estadoJogo === "gameover") { tocarSom(somBotao); iniciarJogo(); }
-        });
-        window.addEventListener("keyup", (e) => teclas[e.key.toLowerCase()] = false);
 
         function iniciarJogo() {
             pontuacao = 0; jogador.x = 100; jogador.y = 400; 
             const p = listaPersonagens[selecaoPersonagem];
             jogador.img = p.img; jogador.h = p.hGameplay || 135;
             modoMarcel = p.especial;
-            if (modoMarcel) spawnVitima(); else { ia.img = loadedImgs.marcel; ia.x = 1600; ia.y = 400; ia.v = 0.5; spawnCerveja(); }
+            if (!modoMarcel) { ia.img = loadedImgs.marcel; ia.x = 1600; ia.y = 400; ia.v = 0.5; cervejaItem.x = 800; }
+            else spawnVitima();
             estadoJogo = "jogando";
         }
 
@@ -137,97 +62,128 @@
             ia.v = 2.5 + (pontuacao * 0.1);
         }
 
-        function spawnCerveja() { cervejaItem = { x: Math.random() * 1600 + 100, y: Math.random() * 200 + 300, ativa: true }; }
+        // --- ENTRADAS ---
+        function interagir(x, y) {
+            canvas.focus();
+            if (estadoJogo === "pre_intro") { estadoJogo = "intro_video"; videoIntro.play().catch(() => { estadoJogo = "menu_principal"; }); return; }
+            if (estadoJogo === "intro_video") { videoIntro.pause(); estadoJogo = "menu_principal"; menuFade = 0; return; }
+            if (somTema.paused && !["gameover", "pre_intro", "intro_video"].includes(estadoJogo)) somTema.play();
 
-        function desenharSprite(img, x, y, h, dir, opac = 1) {
-            if (!img || !img.complete) return;
-            let w = (img.width / img.height) * h;
-            ctx.save(); ctx.globalAlpha = opac;
-            if (dir === -1) { ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, h); }
-            else { ctx.drawImage(img, x, y, w, h); }
-            ctx.restore();
+            if (estadoJogo === "menu_principal") {
+                if (y > 410 && y < 450) { tocarSom(somBotao); estadoJogo = "menu_selecao"; }
+                else if (y > 470 && y < 510) { tocarSom(somBotao); estadoJogo = "menu_instrucoes"; }
+                else if (y > 530 && y < 570) { tocarSom(somBotao); estadoJogo = "menu_creditos"; }
+            } else if (estadoJogo === "menu_selecao") {
+                if (x > 800 && y > 550) { paginaSelecao = (paginaSelecao + 1) % 3; selecaoPersonagem = paginaSelecao * 6; tocarSom(somBotao); return; }
+                let inicio = paginaSelecao * 6;
+                for (let i = 0; i < 6; i++) {
+                    let idx = inicio + i; if (!listaPersonagens[idx]) break;
+                    let col = i % 3, row = Math.floor(i / 3);
+                    let cx = 250 + col * 250, cy = 120 + row * 210;
+                    if (x > cx - 60 && x < cx + 60 && y > cy && y < py + 180) {
+                        selecaoPersonagem = idx; tocarSom(somBotao); iniciarJogo(); return;
+                    }
+                }
+            } else if (["gameover", "menu_instrucoes", "menu_creditos"].includes(estadoJogo)) { estadoJogo = "menu_principal"; }
         }
+
+        window.addEventListener("keydown", (e) => {
+            const k = e.key.toLowerCase(); teclas[k] = true;
+            
+            // Iniciar da Pre-Intro
+            if (estadoJogo === "pre_intro") { 
+                estadoJogo = "intro_video"; 
+                videoIntro.play().catch(() => { estadoJogo = "menu_principal"; }); 
+                return; 
+            }
+
+            if (estadoJogo === "intro_video") { videoIntro.pause(); estadoJogo = "menu_principal"; menuFade = 0; return; }
+            if (e.key === "Escape") { estadoJogo = "menu_principal"; return; }
+
+            if (estadoJogo === "menu_principal") {
+                if (k === "arrowup" || k === "w") { tocarSom(somBotao); selecaoMenu = (selecaoMenu - 1 + 3) % 3; }
+                if (k === "arrowdown" || k === "s") { tocarSom(somBotao); selecaoMenu = (selecaoMenu + 1) % 3; }
+                if (e.key === "Enter") { 
+                    tocarSom(somBotao);
+                    if (selecaoMenu === 0) estadoJogo = "menu_selecao";
+                    else if (selecaoMenu === 1) estadoJogo = "menu_instrucoes";
+                    else estadoJogo = "menu_creditos";
+                }
+            } else if (estadoJogo === "menu_selecao") {
+                if (k === "arrowright" || k === "d") { selecaoPersonagem = (selecaoPersonagem + 1) % listaPersonagens.length; paginaSelecao = Math.floor(selecaoPersonagem / 6); tocarSom(somBotao); }
+                if (k === "arrowleft" || k === "a") { selecaoPersonagem = (selecaoPersonagem - 1 + listaPersonagens.length) % listaPersonagens.length; paginaSelecao = Math.floor(selecaoPersonagem / 6); tocarSom(somBotao); }
+                if (e.key === "Enter") iniciarJogo();
+            } else if (k === "r" && estadoJogo === "gameover") iniciarJogo();
+        });
+
+        window.addEventListener("keyup", (e) => { teclas[e.key.toLowerCase()] = false; });
+        
+        canvas.addEventListener("mousedown", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            interagir((e.clientX - rect.left) * (1000 / rect.width), (e.clientY - rect.top) * (650 / rect.height));
+        });
 
         function loop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             if (estadoJogo === "pre_intro") {
-                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650);
-                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "14px 'Press Start 2P'";
-                ctx.fillText("CLIQUE PARA INICIAR", 500, 325);
-            }
-            else if (estadoJogo === "intro_video") {
+                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650); 
+                ctx.fillStyle = "#f1c40f"; ctx.textAlign = "center"; ctx.font = "24px 'Press Start 2P'"; 
+                ctx.fillText("APERTE QUALQUER TECLA", 500, 310);
+                ctx.fillText("PARA INICIAR", 500, 360);
+            } else if (estadoJogo === "intro_video") {
                 ctx.drawImage(videoIntro, 0, 0, 1000, 650);
-            }
-            else if (estadoJogo === "menu_principal") {
-                if (menuFade < 1) menuFade += 0.02;
-                ctx.globalAlpha = menuFade;
-                if (loadedImgs.inicio.complete) ctx.drawImage(loadedImgs.inicio, 0, 0, canvas.width, canvas.height);
-                
-                // Botão Tela Cheia (Ícone)
-                ctx.fillStyle = "white"; ctx.font = "10px 'Press Start 2P'"; ctx.textAlign = "right";
-                ctx.fillText("[ TELA CHEIA ]", 980, 40);
-
-                ctx.font = "14px 'Press Start 2P'"; ctx.textAlign = "center";
-                // Layout 2x2
-                ctx.fillStyle = "#f1c40f"; ctx.fillText("JOGAR", 300, 460); 
-                ctx.fillStyle = "#3498db"; ctx.fillText("MOBILE", 700, 460);
-                ctx.fillStyle = "white"; ctx.fillText("REGRAS", 300, 560); 
-                ctx.fillText("CREDITOS", 700, 560);
+            } else if (estadoJogo === "menu_principal") {
+                if (menuFade < 1) menuFade += 0.02; ctx.globalAlpha = menuFade;
+                ctx.drawImage(loadedImgs.inicio, 0, 0, 1000, 650);
+                ctx.textAlign = "center"; ctx.font = "20px 'Press Start 2P'";
+                [["JOGAR", 430], ["INSTRUCOES", 490], ["CREDITOS", 550]].forEach((m, i) => {
+                    ctx.fillStyle = (selecaoMenu === i) ? "#f1c40f" : "white"; ctx.fillText("> " + m[0], 500, m[1]);
+                });
                 ctx.globalAlpha = 1;
-            } 
-            else if (estadoJogo === "menu_selecao") {
-                ctx.drawImage(loadedImgs.bg2, 0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "20px 'Press Start 2P'";
-                ctx.fillText("QUEM VAI PRO BAR?", 500, 60);
-                ctx.font = "10px 'Press Start 2P'"; ctx.fillStyle = "#f1c40f"; ctx.textAlign = "right";
-                ctx.fillText("PAGINA " + (paginaSelecao+1) + "/3 >", 960, 590);
-                ctx.textAlign = "center";
-                let inicioIndex = paginaSelecao * 6;
+            } else if (estadoJogo === "menu_selecao") {
+                ctx.drawImage(loadedImgs.bg2, 0, 0, 1000, 650);
+                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "20px 'Press Start 2P'"; ctx.fillText("QUEM VAI PRO BAR?", 500, 60);
+                ctx.font = "10px 'Press Start 2P'"; ctx.fillStyle = "#f1c40f"; ctx.textAlign = "right"; ctx.fillText("PAGINA " + (paginaSelecao+1) + "/3 >", 960, 590);
+                let inicio = paginaSelecao * 6;
                 for (let i = 0; i < 6; i++) {
-                    let idx = inicioIndex + i; if (!listaPersonagens[idx]) break;
+                    let idx = inicio + i; if (!listaPersonagens[idx]) break;
                     let p = listaPersonagens[idx], col = i % 3, row = Math.floor(i / 3);
-                    let charW = (p.img && p.img.complete) ? (p.img.width / p.img.height) * 170 : 80;
-                    let centerX = 250 + col * 250; let py = 120 + row * 210;
-                    desenharSprite(p.img, centerX - charW/2, py, 170, 1);
-                    ctx.fillStyle = "white"; ctx.fillText(p.nome, centerX, py + 195);
+                    let charW = (p.img.width / p.img.height) * 170, cx = 250 + col * 250, cy = 120 + row * 210;
+                    if (selecaoPersonagem === idx) { ctx.shadowColor = "#f1c40f"; ctx.shadowBlur = 20; }
+                    ctx.drawImage(p.img, cx - charW/2, cy, charW, 170);
+                    ctx.shadowBlur = 0; ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.fillText(p.nome, cx, cy + 195);
                 }
             } else if (estadoJogo === "jogando") {
-                let limY = 220;
-                if (teclas.w || teclas.arrowup) jogador.y = Math.max(limY, jogador.y - jogador.v);
-                if (teclas.s || teclas.arrowdown) jogador.y = Math.min(650 - jogador.h, jogador.y + jogador.v);
+                if (teclas.w || teclas.arrowup) jogador.y = Math.max(220, jogador.y - jogador.v);
+                if (teclas.s || teclas.arrowdown) jogador.y = Math.min(515, jogador.y + jogador.v);
                 if (teclas.a || teclas.arrowleft) { jogador.x = Math.max(0, jogador.x - jogador.v); jogador.dir = -1; }
                 if (teclas.d || teclas.arrowright) { jogador.x = Math.min(1700, jogador.x + jogador.v); jogador.dir = 1; }
                 cameraX = Math.max(0, Math.min(jogador.x - 500, 800));
                 ctx.drawImage(loadedImgs.bg, -cameraX, 0, 1800, 650);
-                
-                let jCX = jogador.x + 35, jCY = jogador.y + (jogador.h / 2);
-                if (modoMarcel) {
-                    let dx = ia.x - jogador.x, dy = ia.y - jogador.y, dist = Math.hypot(dx, dy);
-                    if (dist < 400) { ia.x += (dx/dist)*ia.v; ia.y += (dy/dist)*ia.v; ia.dir = dx > 0 ? -1 : 1; }
-                    ia.x = Math.max(50, Math.min(1750, ia.x)); ia.y = Math.max(220, Math.min(500, ia.y));
-                    if (Math.hypot(jCX - (ia.x + 35), jCY - (ia.y + 67)) < 55) { pontuacao++; spawnVitima(); }
-                } else {
+                if (!modoMarcel) {
+                    ctx.drawImage(loadedImgs.cerveja, cervejaItem.x - cameraX, cervejaItem.y, 40, 80);
                     if (ia.x < jogador.x) ia.x += ia.v; else ia.x -= ia.v;
                     if (ia.y < jogador.y) ia.y += ia.v; else ia.y -= ia.v;
-                    if (ia.y < 220) ia.y = 220; // Marcel fica no chão
-                    if (cervejaItem.ativa) {
-                        ctx.drawImage(loadedImgs.cerveja, cervejaItem.x - cameraX, cervejaItem.y, 40, 80);
-                        if (Math.hypot(jCX - (cervejaItem.x + 20), jCY - (cervejaItem.y + 40)) < 55) { somCerveja.play(); pontuacao++; ia.v += 0.08; spawnCerveja(); }
+                    if (ia.y < 220) ia.y = 220;
+                    if (Math.hypot(jogador.x + 35 - (cervejaItem.x + 20), jogador.y + 67 - (cervejaItem.y + 40)) < 55) {
+                        tocarSom(somCerveja); pontuacao++; ia.v += 0.08; cervejaItem.x = Math.random() * 1600 + 100; cervejaItem.y = Math.random() * 200 + 300;
                     }
-                    if (Math.hypot(jCX - (ia.x + 35), jCY - (ia.y + 67)) < 55) estadoJogo = "gameover";
+                    if (Math.hypot(jogador.x + 35 - (ia.x + 35), jogador.y + (jogador.h/2) - (ia.y + 67)) < 55) estadoJogo = "gameover";
+                } else {
+                    let dx = ia.x - jogador.x, dy = ia.y - jogador.y, dist = Math.hypot(dx, dy);
+                    if (dist < 400) { ia.x += (dx/dist)*ia.v; ia.y += (dy/dist)*ia.v; ia.dir = dx > 0 ? -1 : 1; }
+                    if (dist < 60) { pontuacao++; spawnVitima(); }
                 }
-                desenharSprite(ia.img, ia.x - cameraX, ia.y, 135, ia.dir);
-                desenharSprite(jogador.img, jogador.x - cameraX, jogador.y, jogador.h, jogador.dir);
+                let jW = (jogador.img.width / jogador.img.height) * jogador.h;
+                let iW = (ia.img.width / ia.img.height) * 135;
+                ctx.save(); if(ia.dir === -1) { ctx.translate(ia.x-cameraX+iW, ia.y); ctx.scale(-1,1); ctx.drawImage(ia.img, 0, 0, iW, 135); } else ctx.drawImage(ia.img, ia.x-cameraX, ia.y, iW, 135); ctx.restore();
+                ctx.save(); if(jogador.dir === -1) { ctx.translate(jogador.x-cameraX+jW, jogador.y); ctx.scale(-1,1); ctx.drawImage(jogador.img, 0, 0, jW, jogador.h); } else ctx.drawImage(jogador.img, jogador.x-cameraX, jogador.y, jW, jogador.h); ctx.restore();
                 ctx.fillStyle = "white"; ctx.textAlign = "left"; ctx.font = "16px 'Press Start 2P'";
-                ctx.fillText((modoMarcel ? "INFINITO: " : ": ") + pontuacao, 55, 50);
+                ctx.fillText((modoMarcel ? "INFINITO: " : "CONTA: ") + pontuacao, 50, 50);
             } else if (estadoJogo === "gameover") {
-                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650); ctx.textAlign = "center";
-                ctx.fillStyle = "red"; ctx.font = "20px 'Press Start 2P'"; ctx.fillText("GAME OVER", 500, 300);
-                ctx.fillStyle = "white"; ctx.font = "12px 'Press Start 2P'"; ctx.fillText("PONTOS: " + pontuacao, 500, 380);
+                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650); ctx.fillStyle = "red"; ctx.textAlign = "center"; ctx.font = "30px 'Press Start 2P'"; ctx.fillText("GAME OVER", 500, 300);
             } else if (estadoJogo === "menu_creditos") ctx.drawImage(loadedImgs.creditos, 0, 0, 1000, 650);
             else if (estadoJogo === "menu_instrucoes") ctx.drawImage(loadedImgs.instrucoes, 0, 0, 1000, 650);
-            
             requestAnimationFrame(loop);
         } loop();
     </script>
