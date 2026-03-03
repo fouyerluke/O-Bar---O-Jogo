@@ -46,7 +46,7 @@
         let estadoJogo = "pre_intro", selecaoMenu = 0, selecaoPersonagem = 0, paginaSelecao = 0, pontuacao = 0, cameraX = 0;
         let modoMarcel = false, teclas = {}, menuFade = 0, tempoSaideira = 120;
 
-        let jogador = { x: 100, y: 400, h: 135, v: 5, img: null, dir: 1, voando: false, tVoo: 0, imortal: false, tImortal: 0 };
+        let jogador = { x: 100, y: 400, h: 135, v: 5, vBase: 5, img: null, dir: 1, voando: false, tVoo: 0, imortal: false, tImortal: 0 };
         let ia = { x: 1600, y: 400, h: 135, v: 0.5, img: null, dir: -1 };
         let cervejaItem = { x: 800, y: 400, ativa: true };
         let drinkVoo = { x: -200, y: -200, ativa: false }, drinkImortal = { x: -200, y: -200, ativa: false };
@@ -74,9 +74,9 @@
             let pAleatorio = listaPersonagens[sort];
             ia.img = pAleatorio.img; 
             ia.x = Math.random() * 1400 + 200; 
-            ia.y = Math.random() * 200 + 300; // Base do pé
+            ia.y = Math.random() * 200 + 300;
             ia.h = (pAleatorio.nome === "VALERIO") ? 200 : 135;
-            ia.v = 4.2 + (pontuacao * 0.12); 
+            ia.v = 4.8 + (pontuacao * 0.1); 
         }
 
         function interagir(x, y) {
@@ -189,30 +189,29 @@
 
                     if (dist < 450) { 
                         let dirX = dx / dist, dirY = dy / dist;
-                        ia.x += dirX * ia.v;
-                        ia.y += dirY * ia.v;
-                        if (ia.x < 150 || ia.x > 1650) ia.y += (dy > 0 ? 1 : -1) * (ia.v * 1.5);
+                        
+                        // SENSOR DE PAREDE: Se estiver perto do limite X, desativa fuga horizontal e corre vertical
+                        if (ia.x < 100 || ia.x > 1700) {
+                            ia.y += (dy > 0 ? 1 : -1) * (ia.v * 1.5); // Foge só para cima ou baixo
+                        } else {
+                            ia.x += dirX * ia.v;
+                            ia.y += dirY * ia.v;
+                        }
                         ia.dir = dx > 0 ? 1 : -1;
                     }
                     ia.x = Math.max(50, Math.min(1750, ia.x)); 
                     ia.y = Math.max(220, Math.min(515, ia.y));
-                    // Hitbox de captura
-                    if (Math.hypot(jCX - (ia.x + 35), jCY - (ia.y - (ia.h/2) + ia.h/2)) < 70) { pontuacao++; spawnVitima(); }
+                    
+                    if (Math.hypot(jCX - (ia.x + 35), jCY - (ia.y - (ia.h/2) + ia.h/2)) < 85) { 
+                        pontuacao++; spawnVitima(); 
+                        // Boost de velocidade temporário para o Marcel
+                        jogador.v = jogador.vBase + 2;
+                        setTimeout(() => jogador.v = jogador.vBase, 800);
+                    }
                 }
 
-                let jW = (jogador.img.width / jogador.img.height) * jogador.h;
-                let iW = (ia.img.width / ia.img.height) * ia.h;
-                
-                // DESENHO IA (Corrigido para alinhar os pés no Y)
-                ctx.save(); 
-                if(ia.dir === -1) { 
-                    ctx.translate(ia.x-cameraX+iW, ia.y - ia.h + 135); // Ajuste de base
-                    ctx.scale(-1,1); ctx.drawImage(ia.img, 0, 0, iW, ia.h); 
-                } else {
-                    ctx.drawImage(ia.img, ia.x-cameraX, ia.y - ia.h + 135, iW, ia.h); 
-                }
-                ctx.restore();
-
+                let jW = (jogador.img.width / jogador.img.height) * jogador.h, iW = (ia.img.width / ia.img.height) * ia.h;
+                ctx.save(); if(ia.dir === -1) { ctx.translate(ia.x-cameraX+iW, ia.y - ia.h + 135); ctx.scale(-1,1); ctx.drawImage(ia.img, 0, 0, iW, ia.h); } else { ctx.drawImage(ia.img, ia.x-cameraX, ia.y - ia.h + 135, iW, ia.h); } ctx.restore();
                 if (jogador.imortal && Math.floor(Date.now() / 100) % 2) ctx.filter = "brightness(2) sepia(1)";
                 ctx.save(); if(jogador.dir === -1) { ctx.translate(jogador.x-cameraX+jW, jogador.y); ctx.scale(-1,1); ctx.drawImage(jogador.img, 0, 0, jW, jogador.h); } else ctx.drawImage(jogador.img, jogador.x-cameraX, jogador.y, jW, jogador.h); ctx.restore();
                 ctx.filter = "none";
