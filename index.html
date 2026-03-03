@@ -6,7 +6,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body { background-color: #1a1a1a; color: white; font-family: 'Press Start 2P', cursive; display: flex; flex-direction: column; align-items: center; margin: 0; padding-top: 10px; overflow: hidden; }
-        canvas { border: 4px solid #5d4037; border-radius: 8px; background-color: #000; width: 85vw; max-width: 1000px; height: auto; image-rendering: pixelated; }
+        canvas { border: 4px solid #5d4037; border-radius: 8px; background-color: #000; width: 85vw; max-width: 1000px; height: auto; image-rendering: pixelated; outline: none; }
     </style>
 </head>
 <body>
@@ -17,7 +17,6 @@
         const ctx = canvas.getContext("2d");
         const urlBase = "https://raw.githubusercontent.com/fouyerluke/O-Bar---O-Jogo/main/O%20Bar%20-%20O%20Jogo/M%C3%ADdia/";
 
-        // --- MÍDIA ---
         const videoIntro = document.createElement("video");
         videoIntro.src = urlBase + "intro.mp4";
         videoIntro.onended = () => { estadoJogo = "menu_principal"; menuFade = 0; };
@@ -37,23 +36,34 @@
         const listaPersonagens = charNames.map(char => { let i = new Image(); i.src = urlBase + char.id + ".png"; return { ...char, img: i }; });
         const somBotao = new Audio(urlBase + "botao.mp3");
         const somCerveja = new Audio(urlBase + "cerveja.mp3");
+        const somDrink = new Audio(urlBase + "drink.mp3");
         const somTema = new Audio(urlBase + "tema.mp3"); somTema.loop = true;
         function tocarSom(som) { som.currentTime = 0; som.play().catch(e => {}); }
 
         let estadoJogo = "pre_intro", selecaoMenu = 0, selecaoPersonagem = 0, paginaSelecao = 0, pontuacao = 0, cameraX = 0;
         let modoMarcel = false, teclas = {}, menuFade = 0;
-        let jogador = { x: 100, y: 400, h: 135, v: 5, img: null, dir: 1 };
+        let jogador = { x: 100, y: 400, h: 135, v: 5, img: null, dir: 1, voando: false, tVoo: 0, imortal: false, tImortal: 0 };
         let ia = { x: 1600, y: 400, h: 135, v: 0.5, img: null, dir: -1 };
         let cervejaItem = { x: 800, y: 400, ativa: true };
+        let drinkVoo = { x: -200, y: -200, ativa: false }, drinkImortal = { x: -200, y: -200, ativa: false };
+
+        function spawnItens() {
+            cervejaItem = { x: Math.random() * 1600 + 100, y: Math.random() * 200 + 300, ativa: true };
+            drinkVoo.ativa = Math.random() < 0.15;
+            drinkImortal.ativa = Math.random() < 0.10;
+            if(drinkVoo.ativa) { drinkVoo.x = Math.random() * 1600 + 100; drinkVoo.y = Math.random() * 200 + 300; }
+            if(drinkImortal.ativa) { drinkImortal.x = Math.random() * 1600 + 100; drinkImortal.y = Math.random() * 200 + 300; }
+        }
 
         function iniciarJogo() {
-            pontuacao = 0; jogador.x = 100; jogador.y = 400; 
+            pontuacao = 0; jogador.x = 100; jogador.y = 400; jogador.voando = false; jogador.imortal = false;
             const p = listaPersonagens[selecaoPersonagem];
             jogador.img = p.img; jogador.h = p.hGameplay || 135;
             modoMarcel = p.especial;
-            if (!modoMarcel) { ia.img = loadedImgs.marcel; ia.x = 1600; ia.y = 400; ia.v = 0.5; cervejaItem.x = 800; }
+            if (!modoMarcel) { ia.img = loadedImgs.marcel; ia.x = 1600; ia.y = 400; ia.v = 0.5; spawnItens(); }
             else spawnVitima();
             estadoJogo = "jogando";
+            somTema.currentTime = 0; somTema.play();
         }
 
         function spawnVitima() {
@@ -62,13 +72,11 @@
             ia.v = 2.5 + (pontuacao * 0.1);
         }
 
-        // --- ENTRADAS ---
         function interagir(x, y) {
             canvas.focus();
             if (estadoJogo === "pre_intro") { estadoJogo = "intro_video"; videoIntro.play().catch(() => { estadoJogo = "menu_principal"; }); return; }
             if (estadoJogo === "intro_video") { videoIntro.pause(); estadoJogo = "menu_principal"; menuFade = 0; return; }
-            if (somTema.paused && !["gameover", "pre_intro", "intro_video"].includes(estadoJogo)) somTema.play();
-
+            
             if (estadoJogo === "menu_principal") {
                 if (y > 410 && y < 450) { tocarSom(somBotao); estadoJogo = "menu_selecao"; }
                 else if (y > 470 && y < 510) { tocarSom(somBotao); estadoJogo = "menu_instrucoes"; }
@@ -80,44 +88,27 @@
                     let idx = inicio + i; if (!listaPersonagens[idx]) break;
                     let col = i % 3, row = Math.floor(i / 3);
                     let cx = 250 + col * 250, cy = 120 + row * 210;
-                    if (x > cx - 60 && x < cx + 60 && y > cy && y < py + 180) {
-                        selecaoPersonagem = idx; tocarSom(somBotao); iniciarJogo(); return;
-                    }
+                    if (x > cx - 60 && x < cx + 60 && y > cy && y < cy + 180) { selecaoPersonagem = idx; tocarSom(somBotao); iniciarJogo(); return; }
                 }
             } else if (["gameover", "menu_instrucoes", "menu_creditos"].includes(estadoJogo)) { estadoJogo = "menu_principal"; }
         }
 
         window.addEventListener("keydown", (e) => {
             const k = e.key.toLowerCase(); teclas[k] = true;
-            
-            // Iniciar da Pre-Intro
-            if (estadoJogo === "pre_intro") { 
-                estadoJogo = "intro_video"; 
-                videoIntro.play().catch(() => { estadoJogo = "menu_principal"; }); 
-                return; 
-            }
-
+            if (estadoJogo === "pre_intro") { estadoJogo = "intro_video"; videoIntro.play().catch(() => { estadoJogo = "menu_principal"; }); return; }
             if (estadoJogo === "intro_video") { videoIntro.pause(); estadoJogo = "menu_principal"; menuFade = 0; return; }
-            if (e.key === "Escape") { estadoJogo = "menu_principal"; return; }
-
+            if (e.key === "Escape") { estadoJogo = "menu_principal"; somTema.pause(); return; }
             if (estadoJogo === "menu_principal") {
                 if (k === "arrowup" || k === "w") { tocarSom(somBotao); selecaoMenu = (selecaoMenu - 1 + 3) % 3; }
                 if (k === "arrowdown" || k === "s") { tocarSom(somBotao); selecaoMenu = (selecaoMenu + 1) % 3; }
-                if (e.key === "Enter") { 
-                    tocarSom(somBotao);
-                    if (selecaoMenu === 0) estadoJogo = "menu_selecao";
-                    else if (selecaoMenu === 1) estadoJogo = "menu_instrucoes";
-                    else estadoJogo = "menu_creditos";
-                }
+                if (e.key === "Enter") { tocarSom(somBotao); if (selecaoMenu === 0) estadoJogo = "menu_selecao"; else if (selecaoMenu === 1) estadoJogo = "menu_instrucoes"; else estadoJogo = "menu_creditos"; }
             } else if (estadoJogo === "menu_selecao") {
                 if (k === "arrowright" || k === "d") { selecaoPersonagem = (selecaoPersonagem + 1) % listaPersonagens.length; paginaSelecao = Math.floor(selecaoPersonagem / 6); tocarSom(somBotao); }
                 if (k === "arrowleft" || k === "a") { selecaoPersonagem = (selecaoPersonagem - 1 + listaPersonagens.length) % listaPersonagens.length; paginaSelecao = Math.floor(selecaoPersonagem / 6); tocarSom(somBotao); }
                 if (e.key === "Enter") iniciarJogo();
             } else if (k === "r" && estadoJogo === "gameover") iniciarJogo();
         });
-
         window.addEventListener("keyup", (e) => { teclas[e.key.toLowerCase()] = false; });
-        
         canvas.addEventListener("mousedown", (e) => {
             const rect = canvas.getBoundingClientRect();
             interagir((e.clientX - rect.left) * (1000 / rect.width), (e.clientY - rect.top) * (650 / rect.height));
@@ -126,10 +117,8 @@
         function loop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (estadoJogo === "pre_intro") {
-                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650); 
-                ctx.fillStyle = "#f1c40f"; ctx.textAlign = "center"; ctx.font = "24px 'Press Start 2P'"; 
-                ctx.fillText("APERTE QUALQUER TECLA", 500, 310);
-                ctx.fillText("PARA INICIAR", 500, 360);
+                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650); ctx.fillStyle = "#f1c40f"; ctx.textAlign = "center"; ctx.font = "24px 'Press Start 2P'"; 
+                ctx.fillText("APERTE QUALQUER TECLA", 500, 310); ctx.fillText("PARA INICIAR", 500, 360);
             } else if (estadoJogo === "intro_video") {
                 ctx.drawImage(videoIntro, 0, 0, 1000, 650);
             } else if (estadoJogo === "menu_principal") {
@@ -154,34 +143,67 @@
                     ctx.shadowBlur = 0; ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.fillText(p.nome, cx, cy + 195);
                 }
             } else if (estadoJogo === "jogando") {
-                if (teclas.w || teclas.arrowup) jogador.y = Math.max(220, jogador.y - jogador.v);
+                let limY = jogador.voando ? 0 : 220;
+                if (teclas.w || teclas.arrowup) jogador.y = Math.max(limY, jogador.y - jogador.v);
                 if (teclas.s || teclas.arrowdown) jogador.y = Math.min(515, jogador.y + jogador.v);
                 if (teclas.a || teclas.arrowleft) { jogador.x = Math.max(0, jogador.x - jogador.v); jogador.dir = -1; }
                 if (teclas.d || teclas.arrowright) { jogador.x = Math.min(1700, jogador.x + jogador.v); jogador.dir = 1; }
+                
+                if (jogador.tVoo > 0) jogador.tVoo--; else jogador.voando = false;
+                if (jogador.tImortal > 0) jogador.tImortal--; else jogador.imortal = false;
+
                 cameraX = Math.max(0, Math.min(jogador.x - 500, 800));
                 ctx.drawImage(loadedImgs.bg, -cameraX, 0, 1800, 650);
+                
+                let jCX = jogador.x + 35, jCY = jogador.y + (jogador.h / 2);
+                let iCX = ia.x + 35, iCY = ia.y + 67;
+
                 if (!modoMarcel) {
-                    ctx.drawImage(loadedImgs.cerveja, cervejaItem.x - cameraX, cervejaItem.y, 40, 80);
                     if (ia.x < jogador.x) ia.x += ia.v; else ia.x -= ia.v;
                     if (ia.y < jogador.y) ia.y += ia.v; else ia.y -= ia.v;
                     if (ia.y < 220) ia.y = 220;
-                    if (Math.hypot(jogador.x + 35 - (cervejaItem.x + 20), jogador.y + 67 - (cervejaItem.y + 40)) < 55) {
-                        tocarSom(somCerveja); pontuacao++; ia.v += 0.08; cervejaItem.x = Math.random() * 1600 + 100; cervejaItem.y = Math.random() * 200 + 300;
+                    
+                    ctx.drawImage(loadedImgs.cerveja, cervejaItem.x - cameraX, cervejaItem.y, 40, 80);
+                    if (Math.hypot(jCX - (cervejaItem.x + 20), jCY - (cervejaItem.y + 40)) < 55) { tocarSom(somCerveja); pontuacao++; ia.v += 0.08; spawnItens(); }
+                    
+                    if (drinkVoo.ativa) {
+                        ctx.drawImage(loadedImgs.drink, drinkVoo.x - cameraX, drinkVoo.y, 45, 85);
+                        if (Math.hypot(jCX - (drinkVoo.x + 22), jCY - (drinkVoo.y + 42)) < 55) { tocarSom(somDrink); jogador.voando = true; jogador.tVoo = 480; drinkVoo.ativa = false; }
                     }
-                    if (Math.hypot(jogador.x + 35 - (ia.x + 35), jogador.y + (jogador.h/2) - (ia.y + 67)) < 55) estadoJogo = "gameover";
+                    if (drinkImortal.ativa) {
+                        ctx.drawImage(loadedImgs.drink2, drinkImortal.x - cameraX, drinkImortal.y, 45, 85);
+                        if (Math.hypot(jCX - (drinkImortal.x + 22), jCY - (drinkImortal.y + 42)) < 55) { tocarSom(somDrink); jogador.imortal = true; jogador.tImortal = 600; drinkImortal.ativa = false; }
+                    }
+
+                    if (Math.hypot(jCX - iCX, jCY - iCY) < 55 && !jogador.imortal) { estadoJogo = "gameover"; somTema.pause(); }
                 } else {
                     let dx = ia.x - jogador.x, dy = ia.y - jogador.y, dist = Math.hypot(dx, dy);
                     if (dist < 400) { ia.x += (dx/dist)*ia.v; ia.y += (dy/dist)*ia.v; ia.dir = dx > 0 ? -1 : 1; }
                     if (dist < 60) { pontuacao++; spawnVitima(); }
                 }
+
                 let jW = (jogador.img.width / jogador.img.height) * jogador.h;
                 let iW = (ia.img.width / ia.img.height) * 135;
+                
                 ctx.save(); if(ia.dir === -1) { ctx.translate(ia.x-cameraX+iW, ia.y); ctx.scale(-1,1); ctx.drawImage(ia.img, 0, 0, iW, 135); } else ctx.drawImage(ia.img, ia.x-cameraX, ia.y, iW, 135); ctx.restore();
+                
+                if (jogador.imortal && Math.floor(Date.now() / 100) % 2) ctx.filter = "brightness(2) sepia(1)";
                 ctx.save(); if(jogador.dir === -1) { ctx.translate(jogador.x-cameraX+jW, jogador.y); ctx.scale(-1,1); ctx.drawImage(jogador.img, 0, 0, jW, jogador.h); } else ctx.drawImage(jogador.img, jogador.x-cameraX, jogador.y, jW, jogador.h); ctx.restore();
+                ctx.filter = "none";
+
                 ctx.fillStyle = "white"; ctx.textAlign = "left"; ctx.font = "16px 'Press Start 2P'";
-                ctx.fillText((modoMarcel ? "INFINITO: " : "CONTA: ") + pontuacao, 50, 50);
+                if (!modoMarcel) { ctx.drawImage(loadedImgs.cerveja, 20, 20, 20, 40); ctx.fillText(": " + pontuacao, 55, 50); }
+                else { ctx.fillText("INFINITO: " + pontuacao, 20, 50); }
+                if (jogador.voando) { ctx.fillStyle = "#3498db"; ctx.fillText("VOO", 200, 50); }
+                if (jogador.imortal) { ctx.fillStyle = "#f1c40f"; ctx.fillText("IMORTAL", 350, 50); }
+
             } else if (estadoJogo === "gameover") {
-                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650); ctx.fillStyle = "red"; ctx.textAlign = "center"; ctx.font = "30px 'Press Start 2P'"; ctx.fillText("GAME OVER", 500, 300);
+                ctx.fillStyle = "black"; ctx.fillRect(0,0,1000,650); ctx.textAlign = "center";
+                ctx.fillStyle = "red"; ctx.font = "30px 'Press Start 2P'";
+                ctx.fillText(modoMarcel ? "ALGUÉM ESCAPOU!" : "MARCEL TE PEGOU!", 500, 280);
+                ctx.fillStyle = "white"; ctx.font = "18px 'Press Start 2P'";
+                ctx.fillText("CONTA FINAL: " + pontuacao + (modoMarcel ? " CLIENTES" : " CERVEJAS"), 500, 360);
+                ctx.font = "12px 'Press Start 2P'"; ctx.fillStyle = "#bdc3c7"; ctx.fillText("PRESSIONE R PARA REINICIAR OU ESC PARA O MENU", 500, 450);
             } else if (estadoJogo === "menu_creditos") ctx.drawImage(loadedImgs.creditos, 0, 0, 1000, 650);
             else if (estadoJogo === "menu_instrucoes") ctx.drawImage(loadedImgs.instrucoes, 0, 0, 1000, 650);
             requestAnimationFrame(loop);
